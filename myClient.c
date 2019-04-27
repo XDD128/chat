@@ -19,7 +19,7 @@
 
 #include "networks.h"
 
-#define MAXBUF 1024
+#define MAXBUF 1400
 #define DEBUG_FLAG 1
 #define xstr(a) str(a)
 #define str(a) #a
@@ -45,24 +45,30 @@ int main(int argc, char * argv[])
 
 void sendToServer(int socketNum)
 {
-	char sendBuf[MAXBUF];   //data buffer
-	int sendLen = 0;        //amount of data to send
+	unsigned char sendBuf[MAXBUF];   //data buffer
+	unsigned short sendLen = 0;        //amount of data to send
 	int sent = 0;            //actual amount of data sent/* get the data and send it   */
-			
-	printf("Enter the data to send: ");
-	scanf("%" xstr(MAXBUF) "[^\n]%*[^\n]", sendBuf);
+	unsigned short d;
 	
-	sendLen = strlen(sendBuf) + 1;
-	printf("read: %s len: %d\n", sendBuf, sendLen);
+	printf("Enter the data to send: ");
+	scanf("%" xstr(MAXBUF) "[^\n]%*[^\n]", &sendBuf[2]);
+	
+	sendLen = strlen(&sendBuf[2]) + 1;
+	d = sendLen + 2;
+	printf("D is %d\n", d);
+	d = htons(d);
+	printf("D is %d\n", d);
+	memcpy(sendBuf, &d, 2);
+	printf("read: %s len: %d\n", &sendBuf[2], sendLen);
 		
-	sent =  send(socketNum, sendBuf, sendLen, 0);
+	sent =  send(socketNum, sendBuf, sendLen + 2, 0);
 	if (sent < 0)
 	{
 		perror("send call");
 		exit(-1);
 	}
 
-	printf("String sent: %s \n", sendBuf);
+	printf("String sent: %s \n", &sendBuf[2]);
 	printf("Amount of data sent is: %d\n", sent);
 }
 

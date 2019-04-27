@@ -14,11 +14,10 @@
 
 #include "networks.h"
 
-struct handle
-{
-    int len;
-    char field[100];
-}
+#define MAXBUF 1400
+#define DEBUG_FLAG 1
+
+
 
 int main(int argc, char * argv[])
 {  

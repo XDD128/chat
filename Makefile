@@ -4,7 +4,7 @@
 CC= gcc
 CFLAGS= -g -Wall
 LIBS = 
-
+OBJS = networks.o gethostbyname6.o funcs.o
 
 all:   myClient myServer
 
