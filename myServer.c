@@ -31,7 +31,6 @@ void recv_rest(int clientSocket, unsigned char *buf);
 static fd_set socketfd;
 
 
-
 int main(int argc, char *argv[])
 {
 	int serverSocket = 0;   //socket descriptor for the server socket
@@ -76,8 +75,8 @@ void recvPacket(int clientSocket){
 		perror("recv call");
 		exit(-1);
 	}
-	
-	pdu_len = ntohs(&buf[0]);
+	memcpy(&pdu_len, buf, 2);
+	pdu_len = ntohs(pdu_len);
 	packetIndex += messageLen;
 	printf("recv first 2 packets : %d, pdulen: %d\n", packetIndex, pdu_len);
 	if (pdu_len > MAXBUF-2){
@@ -93,7 +92,7 @@ void recvPacket(int clientSocket){
 		}
 	}
 	else{
-		printf("C1\n");
+		printf("C2\n");
 		while (packetIndex < pdu_len){
 			if ((messageLen = recv(clientSocket, &buf[packetIndex-1], pdu_len-packetIndex, 0)) < 0)
 			{
@@ -106,7 +105,6 @@ void recvPacket(int clientSocket){
 		}
 	}
 	printf("Message received, length: %d Data: %.*s\n", pdu_len, pdu_len, buf);
-
 }
 
 

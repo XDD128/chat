@@ -49,7 +49,8 @@ void sendToServer(int socketNum)
 	unsigned short sendLen = 0;        //amount of data to send
 	int sent = 0;            //actual amount of data sent/* get the data and send it   */
 	unsigned short d;
-	
+	int i;
+
 	printf("Enter the data to send: ");
 	scanf("%" xstr(MAXBUF) "[^\n]%*[^\n]", &sendBuf[2]);
 	
@@ -60,7 +61,10 @@ void sendToServer(int socketNum)
 	printf("D is %d\n", d);
 	memcpy(sendBuf, &d, 2);
 	printf("read: %s len: %d\n", &sendBuf[2], sendLen);
-		
+	for (i = 0; i < sendLen + 2; i++){
+		printf("%02x", sendBuf[i]);
+	}
+	printf("\n");
 	sent =  send(socketNum, sendBuf, sendLen + 2, 0);
 	if (sent < 0)
 	{
