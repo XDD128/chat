@@ -8,11 +8,11 @@ OBJS = networks.o gethostbyname6.o funcs.o
 
 all:   myClient myServer
 
-myClient: myClient.c networks.o gethostbyname6.o
-	$(CC) $(CFLAGS) -o myClient myClient.c networks.o gethostbyname6.o $(LIBS)
+myClient: myClient.c $(OBJS)
+	$(CC) $(CFLAGS) -o myClient myClient.c $(OBJS) $(LIBS)
 
-myServer: myServer.c networks.o gethostbyname6.o
-	$(CC) $(CFLAGS) -o myServer myServer.c networks.o gethostbyname6.o $(LIBS)
+myServer: myServer.c $(OBJS)
+	$(CC) $(CFLAGS) -o myServer myServer.c $(OBJS) $(LIBS)
 
 .c.o:
 	gcc -c $(CFLAGS) $< -o $@ $(LIBS)

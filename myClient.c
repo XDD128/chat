@@ -18,6 +18,7 @@
 #include <netdb.h>
 
 #include "networks.h"
+#include "funcs.h"
 
 #define MAXBUF 1400
 #define DEBUG_FLAG 1
@@ -26,15 +27,17 @@
 
 void sendToServer(int socketNum);
 void checkArgs(int argc, char * argv[]);
+void sendInit(int socketNum);
 
 int main(int argc, char * argv[])
 {
 	int socketNum = 0;         //socket descriptor
 	
 	checkArgs(argc, argv);
-
+	
 	/* set up the TCP Client socket  */
 	socketNum = tcpClientSetup(argv[1], argv[2], DEBUG_FLAG);
+	
 	
 	sendToServer(socketNum);
 	
@@ -79,9 +82,9 @@ void sendToServer(int socketNum)
 void checkArgs(int argc, char * argv[])
 {
 	/* check command line arguments  */
-	if (argc != 3)
+	if (argc != 4)
 	{
-		printf("usage: %s host-name port-number \n", argv[0]);
+		printf("usage: %s handle host-name port-number \n", argv[0]);
 		exit(1);
 	}
 }

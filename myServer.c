@@ -24,7 +24,7 @@
 #define DEBUG_FLAG 1
 
 void recvFromClient(int clientSocket);
-void recvPacket(int clientSocket);
+int recvPacket(int clientSocket, unsigned char *buf);
 int checkArgs(int argc, char *argv[]);
 int recv_len(int clientSocket, unsigned char *buf);
 void recv_rest(int clientSocket, unsigned char *buf);
@@ -32,17 +32,35 @@ static fd_set socketfd;
 
 
 int main(int argc, char *argv[])
-{
+{	unsigned char buf[MAX_SIZE];
 	int serverSocket = 0;   //socket descriptor for the server socket
 	int clientSocket = 0;   //socket descriptor for the client socket
 	int portNumber = 0;
-	
+	int packetLen;
+	initTable();
 	FD_ZERO(&socketfd);
 	portNumber = checkArgs(argc, argv);
 	
 	//create the server socket
 	serverSocket = tcpServerSetup(portNumber);
 	FD_SET(serverSocket, &socketfd);
+	
+	while (1){
+		int i = 0;
+		select(serverSocket + 1, &socketfd, (fd_set*) 0, (fd_set*)0, NULL);
+		for (i; i<FD_SETSIZE; i++){
+			if (FD_ISSET(i, &socketfd)){
+				if (i == serverSocket){//unconnected socket
+					packetLen = recvPacket(i, buf);
+					processServerPacket(i, buf, packetLen);
+
+				}
+				else{}//already connected socket
+			}
+
+	
+		}
+	}
 	select(serverSocket + 1, &socketfd, (fd_set*) 0, (fd_set*)0, NULL);
 	printf("Selecting");
 	// wait for client to connect
@@ -62,8 +80,8 @@ int main(int argc, char *argv[])
 	return 0;
 }
 //add unsigned char *buf
-void recvPacket(int clientSocket){
-	unsigned char buf[MAX_SIZE];
+int recvPacket(int clientSocket, unsigned char *buf){
+	
 	int messageLen = 0;
 	int packetIndex = 0;
 	unsigned short pdu_len;
@@ -101,11 +119,13 @@ void recvPacket(int clientSocket){
 			}
 	
 			packetIndex += messageLen;
-			//("At Index C2 : %d\n", packetIndex);
+			//printf("At Index C2 : %d\n", packetIndex);
 		}
 	}
 	printf("Message received, length: %d Data: %.*s\n", pdu_len, pdu_len, buf);
+	return packetIndex;
 }
+
 
 
 void recvFromClient(int clientSocket)
