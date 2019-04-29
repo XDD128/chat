@@ -24,12 +24,67 @@
 #define DEBUG_FLAG 1
 
 void recvFromClient(int clientSocket);
-int recvPacket(int clientSocket, unsigned char *buf);
+
 int checkArgs(int argc, char *argv[]);
 int recv_len(int clientSocket, unsigned char *buf);
 void recv_rest(int clientSocket, unsigned char *buf);
 static fd_set socketfd;
 
+//The server process only need to send, client needs to print shit
+//split each task like this
+int processServerPacket(int socketNum, unsigned char *packetBuf, int packetLen){
+    	
+        //index 2 of packetbuf is where the flag will be
+        switch(packetBuf[2])
+	    {
+        case INIT_FLAG:
+            //special case
+            return processPacket1(socketNum, &packetBuf[4], packetBuf[3]);
+        case BROADCAST_FLAG:
+            processPacket4(packetBuf, packetLen);
+        //if handletable[i] not NULL, forward the packet to them
+		//will sent packet7 as ERROR back to client
+        case MESSAGE_FLAG:
+            processPacket5(socketNum, packetBuf, packetLen);
+        //check 
+
+        case EXIT_FLAG:
+            processPacket8(socketNum);
+        case LIST_FLAG:
+			processPacket10(socketNum);
+        default:
+            perror("For some reason it defaulted");
+            exit(-1);
+	    }
+    
+
+}
+// void processServer(int fdLen, fd_set *fds){
+//     int i = 0;
+//     select(serverSocket + 1, &socketfd, (fd_set*) 0, (fd_set*)0, NULL);
+//     for (i; i<FD_SETSIZE; i++){
+//         if (FD_ISSET(i, &socketfd)){
+//             if (i == serverSocket){//unconnected socket
+//                 clientSocket = tcpAccept(serverSocket, DEBUG_FLAG);
+//                 packetLen = recvPacket(clientSocket, buf);
+//                 if (processServerPacket(clientSocket, buf, packetLen)){
+// 					FD_SET(clientSocket, &socketfd);
+// 				}
+// 				else{
+// 					close(clientSocket);
+// 				}
+
+//             }
+//             else{
+//                 packetLen = recvPacket(i, buf);
+//                 if (packetLen == 0){
+//                     //handle with flag 9 sent to client, remove flag from global set and table, close socket
+//                 }
+//                 processServerPacket(i, buf, packetLen);
+//             }//already connected socket
+//         }
+
+// }
 
 int main(int argc, char *argv[])
 {	unsigned char buf[MAX_SIZE];
@@ -37,6 +92,7 @@ int main(int argc, char *argv[])
 	int clientSocket = 0;   //socket descriptor for the client socket
 	int portNumber = 0;
 	int packetLen;
+	fd_set socketfdm;
 	initTable();
 	FD_ZERO(&socketfd);
 	portNumber = checkArgs(argc, argv);
@@ -44,33 +100,61 @@ int main(int argc, char *argv[])
 	//create the server socket
 	serverSocket = tcpServerSetup(portNumber);
 	FD_SET(serverSocket, &socketfd);
-	
+	int maxsock = serverSocket;
 	while (1){
+		clientSocket = 0;
+		socketfdm = socketfd;
 		int i = 0;
-		select(serverSocket + 1, &socketfd, (fd_set*) 0, (fd_set*)0, NULL);
+		printf("Selecting\n");
+    	select(maxsock+ 1, &socketfdm, (fd_set*) 0, (fd_set*)0, NULL);
+		printf("Done selecting\n");
 		for (i; i<FD_SETSIZE; i++){
-			if (FD_ISSET(i, &socketfd)){
+			if (FD_ISSET(i, &socketfdm)){
+				printf("fd is set %d\n", i);
 				if (i == serverSocket){//unconnected socket
-					packetLen = recvPacket(i, buf);
-					processServerPacket(i, buf, packetLen);
+					clientSocket = tcpAccept(serverSocket, DEBUG_FLAG);
+					packetLen = recvPacket(clientSocket, buf);
+					printf("Line 89 Received %d\n", packetLen);
+					if (processServerPacket(clientSocket, buf, packetLen)){
+						FD_SET(clientSocket, &socketfd);
+						if (clientSocket > maxsock){
+							maxsock = clientSocket;
+						}
+						printf("successfully added the boy, socket: %d\n", clientSocket);
+					}
+					else{
+						close(clientSocket);
+						printf("closed\n");
+					}
 
 				}
-				else{}//already connected socket
-			}
+				else{
+					packetLen = recvPacket(i, buf);
+					if (packetLen < 1){
+						delTable(i);
+						FD_CLR(i, &socketfd);
+						close(i);
+						//handle with flag 9 sent to client, remove flag from global set and table, close socket
+					}
+					else if (EXIT_FLAG == processServerPacket(i, buf, packetLen)){
+						FD_CLR(i, &socketfd);
+						close(i);
 
-	
+					}
+				}//already connected socket
+			}			
 		}
 	}
-	select(serverSocket + 1, &socketfd, (fd_set*) 0, (fd_set*)0, NULL);
-	printf("Selecting");
-	// wait for client to connect
-	if (FD_ISSET(serverSocket, &socketfd)){
+	// select(serverSocket + 1, &socketfd, (fd_set*) 0, (fd_set*)0, NULL);
+	// printf("Selecting");
+	// // wait for client to connect
+	// if (FD_ISSET(serverSocket, &socketfd)){
 		
-		clientSocket = tcpAccept(serverSocket, DEBUG_FLAG);
-	}
+	// 	clientSocket = tcpAccept(serverSocket, DEBUG_FLAG);
+	// }
 	
 
-	recvPacket(clientSocket);
+	//recvPacket(clientSocket);
 	
 	/* close the sockets */
 	close(clientSocket);
@@ -79,52 +163,7 @@ int main(int argc, char *argv[])
 	
 	return 0;
 }
-//add unsigned char *buf
-int recvPacket(int clientSocket, unsigned char *buf){
-	
-	int messageLen = 0;
-	int packetIndex = 0;
-	unsigned short pdu_len;
-	//here, for recv, check the first byte for the size. 
-	//If recv didnt get the correct size, wait and recv again.
-	//now get the data from the client_socket
-	if ((messageLen = recv(clientSocket, buf, 2, 0)) < 0)
-	{
-		perror("recv call");
-		exit(-1);
-	}
-	memcpy(&pdu_len, buf, 2);
-	pdu_len = ntohs(pdu_len);
-	packetIndex += messageLen;
-	printf("recv first 2 packets : %d, pdulen: %d\n", packetIndex, pdu_len);
-	if (pdu_len > MAXBUF-2){
-		printf("C1\n");
-		while (packetIndex < MAXBUF){
-			if ((messageLen = recv(clientSocket, &buf[packetIndex-1], MAXBUF-packetIndex, 0)) < 0)
-			{
-				perror("recv call");
-				exit(-1);
-			}
-			packetIndex += messageLen;
-			//printf("At Index C1: %d\n", packetIndex);
-		}
-	}
-	else{
-		printf("C2\n");
-		while (packetIndex < pdu_len){
-			if ((messageLen = recv(clientSocket, &buf[packetIndex-1], pdu_len-packetIndex, 0)) < 0)
-			{
-			perror("recv call");
-			exit(-1);
-			}
-	
-			packetIndex += messageLen;
-			//printf("At Index C2 : %d\n", packetIndex);
-		}
-	}
-	printf("Message received, length: %d Data: %.*s\n", pdu_len, pdu_len, buf);
-	return packetIndex;
-}
+
 
 
 

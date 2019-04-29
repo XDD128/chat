@@ -28,7 +28,38 @@
 void sendToServer(int socketNum);
 void checkArgs(int argc, char * argv[]);
 void sendInit(int socketNum);
+static fd_set socketfd;
+int processClientPacket(int socketNum, unsigned char *packetBuf, int packetLen){
+    	
+        //index 2 of packetbuf is where the flag will be
+        switch(packetBuf[2])
+	    {
+        case INIT_OK:
+            //special case
+            return processPacket1(socketNum, &packetBuf[4], packetBuf[3]);
+        case INIT_ERR:
+            processPacket4(packetBuf, packetLen);
+        //if handletable[i] not NULL, forward the packet to them
+		//will sent packet7 as ERROR back to client
+        case MESSAGE_ERR:
+            processPacket5(socketNum, packetBuf, packetLen);
+        //check 
 
+        case EXIT_OK:
+            processPacket8(socketNum);
+        case LIST_NUMBER:
+			processPacket10(socketNum);
+        default:
+            perror("For some reason it defaulted");
+            exit(-1);
+	    }
+    
+
+}
+
+void takeInput(int socketNum){
+	
+}
 int main(int argc, char * argv[])
 {
 	int socketNum = 0;         //socket descriptor
@@ -36,8 +67,9 @@ int main(int argc, char * argv[])
 	checkArgs(argc, argv);
 	
 	/* set up the TCP Client socket  */
-	socketNum = tcpClientSetup(argv[1], argv[2], DEBUG_FLAG);
+	socketNum = tcpClientSetup(argv[2], argv[3], DEBUG_FLAG);
 	
+	sendHandlePacket(socketNum, argv[1], strlen(argv[1]), 1);
 	
 	sendToServer(socketNum);
 	
@@ -87,4 +119,5 @@ void checkArgs(int argc, char * argv[])
 		printf("usage: %s handle host-name port-number \n", argv[0]);
 		exit(1);
 	}
+	//check if the handle is less than 100
 }

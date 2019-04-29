@@ -33,5 +33,15 @@ struct handle
 }__attribute__((packed));
 
 //use a global variable to count the pdulen
+void sendHandlePacket(int socketNum, unsigned char *name, int handleLen, int flag);
+int processPacket1(int socketNum, unsigned char *field, int handleLen);
 int processServerPacket(int, unsigned char *, int);
+void initHandle(handle hdl);
+void initTable();
+int checkTable(unsigned char *handle, int handleLen);
+void addTable(int socketNumber, unsigned char *field, int handleLen);
+void delTable(int socketNumber);
+void sendChatHeader(int socketNum, int flag);
+int processServerPacket(int socketNum, unsigned char *packetBuf, int packetLen);
+int recvPacket(int clientSocket, unsigned char *buf);
 #endif
