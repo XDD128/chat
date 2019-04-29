@@ -89,10 +89,16 @@ int checkTable(unsigned char *handle, int handleLen){
 
 void addTable(int socketNumber, unsigned char *field, int handleLen){
     //realloc only happens if socket over tablesize happens, but it should only happen by small increments
+    int i;
     if (socketNumber > tableSize-1){
         if(NULL == (handleTable = (handle *)realloc(handleTable,(tableSize + 10)*sizeof(handle)))){
             perror("realloc");
             exit(-1);
+        }
+        //NULL out for realloc
+        tableSize += 10;
+        for (i = tableSize - 10; i < tableSize; i++){
+            handleTable[i] = NULL;
         }
     }
     printf("addTable, length: %d Data: %.*s\n", handleLen, handleLen, field);
@@ -106,11 +112,27 @@ void delTable(int socketNumber){
     free(handleTable[socketNumber]);
     handleTable[socketNumber] = NULL;
 }
+void sendPacket5(unsigned char *input);
+
 void sendChatHeader(int socketNum, int flag){
     struct chat_header ch = {htons(3), flag};
     send(socketNum, &ch, 3, 0);
 }
+void parseMessage(unsigned char *packetBuf, int packetLen){
 
+}
+void parseMessageErr(unsigned char *packetBuf, int packetLen){
+
+}
+
+void printHandlePacket(unsigned char *packet){
+    char handleLen = packet[3];
+    unsigned char printableBuf[MAX_SIZE] = {0};
+    memcpy(printableBuf, &(packet[4]), handleLen);
+
+    printf("%s", printableBuf);
+
+}
 void sendHandlePacket(int socketNum, unsigned char *name, int handleLen, int flag){
     unsigned char buf[MAXBUF];
     struct chat_header ch = {htons(4+handleLen), flag};
@@ -119,13 +141,40 @@ void sendHandlePacket(int socketNum, unsigned char *name, int handleLen, int fla
     memcpy(buf, &ch, 3);
     memcpy(&buf[3], &h, handleLen+1);
     send(socketNum, buf, handleLen + 4, 0);
-    printf("Sent Packet%d\n", flag);
+    printf("Sent Packet %d\n", flag);
 }
-//in client, use a while loop to block until the number of handles is gone
+//in client, use a while loop to block until the number of handles is gone, this is null terminated, use strlen to get from argv
+void sendPacket4(int socketNum, unsigned char *message, unsigned char *name){
+    unsigned char buf[MAX_SIZE] = {0};
+    int messageLen = strlen(&message[3]);
+    int handleLen = strlen(name);
+    struct chat_header ch = {htons(4 + handleLen + messageLen), 4};
+    memcpy(buf, &ch, 3);
+    buf[3] = (unsigned char)handleLen;
+    memcpy(&buf[4], name, handleLen);
+    memcpy(&buf[4 + handleLen], &(message[3]), messageLen);
+    send(socketNum, buf, 4+handleLen+messageLen, 0);
 
+}
+void printMessage(unsigned char *packetBuf, int packetLen){
+    printf("Got to printMessage\n");
+    if (packetBuf[2] == BROADCAST_FLAG){
+        printf("%.*s: %.*s\n", packetBuf[3], &packetBuf[4], packetLen - (packetBuf[3] + 4), &packetBuf[packetBuf[3] + 4]);
+    }
+    else if (packetBuf[2] == MESSAGE_FLAG){
+        printf("%.*s: ", packetBuf[3], &packetBuf[4]);
+        int idx = 4 + packetBuf[3];
+        int numOfHandles = packetBuf[idx];
+        while (numOfHandles){
+            idx += (packetBuf[idx]+1);
+        }
+        printf("%.*s\n", (packetLen - 1) - idx, &packetBuf[idx]);
+    }
+}
 void sendHandleNumPacket(int socketNum, int numOfHandles){
     unsigned char buf[MAXBUF];
-    struct chat_header ch = {7, 11};
+    //
+    struct chat_header ch = {htons(7), 11};
     unsigned long l = htonl(numOfHandles);
     memcpy(buf, &ch, 3);
     memcpy(&buf[3], &l, 4);
@@ -146,7 +195,7 @@ int processPacket1(int socketNum, unsigned char *field, int handleLen){
         return 0;
     }
 }
-
+//NULL check to see if we can broadcast to that socket,            
 void processPacket4(unsigned char *packetBuf, int packetLen){
     int i;
     for (i = 0; i < tableSize; i++){
@@ -158,10 +207,10 @@ void processPacket4(unsigned char *packetBuf, int packetLen){
 //finished
 void processPacket5(int socketNum, unsigned char *packetBuf, int packetLen){
     int clientSocket;
-    int i = 4;//use this to start parsing the names
+    int i = 4;//use this index to start parsing the names
     int numOfHandles = packetBuf[3]; //handles we gotta go through
     while (numOfHandles){
-        //checktable will get us the correct socket number
+        //checktable will get us the correct socket number, if a valid one exists, 
         if(!(clientSocket = checkTable(&packetBuf[i+1], packetBuf[i]))){
             sendHandlePacket(socketNum, &packetBuf[i+1], packetBuf[i], 7);
             printf("Sent packet7 back to socket %d\n", clientSocket);
@@ -173,6 +222,7 @@ void processPacket5(int socketNum, unsigned char *packetBuf, int packetLen){
         numOfHandles--;
     }
 }
+
 //finished
 void processPacket8(int socketNum){
     sendChatHeader(socketNum, 9);
@@ -181,15 +231,40 @@ void processPacket8(int socketNum){
 //process the list of handles
 void processPacket10(int socketNum){
     int i = 0;
+    int d = getNumOfHandles();
     sendHandleNumPacket(socketNum, getNumOfHandles());
+    printf("Sent packet 11 with number : %d\n", d);
     for(i; i<tableSize; i++){
         if (handleTable[i] != NULL){
             sendHandlePacket(socketNum, handleTable[i] -> field, handleTable[i] -> len, 12);
         }
     }
     sendChatHeader(socketNum, 13);
+    printf("sent chat header\n");
 }
 
+void processPacket11(int socketNum, unsigned char *packetBuf){
+    fd_set sock;
+    int packetLen;
+    unsigned long numOfHandles;
+    memcpy(&numOfHandles, &(packetBuf[3]), 4);
+    numOfHandles = ntohl(numOfHandles);
+    printf("Number of Handles is %ld\n", numOfHandles);
+    FD_ZERO(&sock);
+    while (numOfHandles){
+        FD_SET(socketNum, &sock);
+        select(socketNum + 1, &sock, (fd_set*) 0, (fd_set*)0, NULL);
+        packetLen = recvPacket(socketNum, packetBuf);
+        printHandlePacket(packetBuf);
+        printf("\n");
+        numOfHandles--;
+    }
+    FD_SET(socketNum, &sock);
+    select(socketNum + 1, &sock, (fd_set*) 0, (fd_set*)0, NULL);
+    packetLen = recvPacket(socketNum, packetBuf);
+    if (packetBuf[2] != 13)
+        perror("didnt send packet 13 right");
+}
 //finished
 int recvAll(int sock, unsigned char *buf, int len, int flags){
     int packetIndex = 0;

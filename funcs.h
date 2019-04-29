@@ -4,6 +4,8 @@
 #define MAX_SIZE 100
 #define HANDLE_LIMIT 9
 
+#define FLAG_INDEX 2
+
 #define INIT_FLAG 1
 #define INIT_OK 2
 #define INIT_ERR 3
@@ -33,8 +35,18 @@ struct handle
 }__attribute__((packed));
 
 //use a global variable to count the pdulen
+void parseMessage(unsigned char *packetBuf, int packetLen);
+void parseMessageErr(unsigned char *packetBuf, int packetLen);
+void sendPacket4(int socketNum, unsigned char *message, unsigned char *name);
 void sendHandlePacket(int socketNum, unsigned char *name, int handleLen, int flag);
 int processPacket1(int socketNum, unsigned char *field, int handleLen);
+
+void processPacket4(unsigned char *packetBuf, int packetLen);
+void processPacket5(int socketNum, unsigned char *packetBuf, int packetLen);
+void processPacket8(int socketNum);
+void processPacket10(int socketNum);
+void processPacket11(int socketNum, unsigned char *packetBuf);
+
 int processServerPacket(int, unsigned char *, int);
 void initHandle(handle hdl);
 void initTable();

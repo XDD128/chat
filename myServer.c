@@ -42,16 +42,20 @@ int processServerPacket(int socketNum, unsigned char *packetBuf, int packetLen){
             return processPacket1(socketNum, &packetBuf[4], packetBuf[3]);
         case BROADCAST_FLAG:
             processPacket4(packetBuf, packetLen);
+			return BROADCAST_FLAG;
         //if handletable[i] not NULL, forward the packet to them
 		//will sent packet7 as ERROR back to client
         case MESSAGE_FLAG:
             processPacket5(socketNum, packetBuf, packetLen);
+			return MESSAGE_FLAG;
         //check 
 
         case EXIT_FLAG:
             processPacket8(socketNum);
+			return EXIT_FLAG;
         case LIST_FLAG:
 			processPacket10(socketNum);
+			return LIST_FLAG;
         default:
             perror("For some reason it defaulted");
             exit(-1);
@@ -134,12 +138,13 @@ int main(int argc, char *argv[])
 						delTable(i);
 						FD_CLR(i, &socketfd);
 						close(i);
+						printf("Close 1\n");
 						//handle with flag 9 sent to client, remove flag from global set and table, close socket
 					}
 					else if (EXIT_FLAG == processServerPacket(i, buf, packetLen)){
 						FD_CLR(i, &socketfd);
 						close(i);
-
+						printf("Close 2\n");
 					}
 				}//already connected socket
 			}			
