@@ -51,7 +51,6 @@ int processClientPacket(int socketNum, unsigned char *packetBuf, int packetLen){
 	case MESSAGE_ERR:
 		parseMessageErr(packetBuf, packetLen);
 		break;
-	//check 
 
 	case EXIT_OK:
 		close(socketNum);
@@ -68,7 +67,7 @@ int processClientPacket(int socketNum, unsigned char *packetBuf, int packetLen){
 }
 
 void takeInput(int socketNum, unsigned char *handleName){
-	unsigned char buf[MAXBUF];
+	unsigned char buf[MAXBUF] = {0};
 	int len;
 	char *tok;
 	unsigned char numOfHandles;
@@ -76,7 +75,7 @@ void takeInput(int socketNum, unsigned char *handleName){
 	fgets(buf, MAXBUF, stdin);
 	len = strlen(buf) - 1;
 	buf[len] = 0; //NULL out the newline character
-
+	//add 1400 limit here, ignore command
 	if (buf[0] == '%'){
 		buf[1] = tolower(buf[1]);
 		switch(buf[1])
@@ -97,6 +96,7 @@ void takeInput(int socketNum, unsigned char *handleName){
 				sendChatHeader(socketNum, EXIT_FLAG);
 				break;
 			default:
+				perror("Entered invalid command");
 				break;
 		}
 	}
@@ -104,7 +104,7 @@ void takeInput(int socketNum, unsigned char *handleName){
 }
 int main(int argc, char * argv[])
 {
-	unsigned char buf[MAX_SIZE];
+	unsigned char buf[MAXBUF];
 	int socketNum = 0;         //socket descriptor
 	int i;
 	int packetLen;
@@ -116,16 +116,19 @@ int main(int argc, char * argv[])
 	/* set up the TCP Client socket  */
 	socketNum = tcpClientSetup(argv[2], argv[3], DEBUG_FLAG);
 	FD_SET(socketNum, &socketfd);
+	//send initial packet
 	sendHandlePacket(socketNum, argv[1], strlen(argv[1]), 1);
 	while(1){
 		currFd = socketfd;
 		select(socketNum+1, &currFd, (fd_set*) 0, (fd_set*)0, NULL);
-		for(i = 0; i < FD_SETSIZE; i++){
+		for(i = 0; i < socketNum+1; i++){
 			if (FD_ISSET(i, &currFd)){
 				if (i == STDIN_FILENO){
+					printf("STDIN is being set");
 					takeInput(socketNum, argv[1]);
 				}
 				else if (i == socketNum){
+					printf("got something frpm socket\n");
 					packetLen = recvPacket(socketNum, buf);
 					if (packetLen < 1){
 						close(socketNum);
@@ -188,4 +191,12 @@ void checkArgs(int argc, char * argv[])
 		exit(1);
 	}
 	//check if the handle is less than 100
+	if (isdigit(argv[1][0])){
+		perror("Invalid handle, handle starts with a number");
+		exit(1);
+	}
+	if (strlen(argv[1]) > 100){
+		fprintf(stderr, "Invalid handle, handle longer than 100 characters: %s\n", argv[1]);
+		exit(1);
+	}
 }

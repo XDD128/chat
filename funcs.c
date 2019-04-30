@@ -20,6 +20,9 @@ static handle *handleTable;
 static int tableSize;
 //set to size 10
 
+void messageFormat(){
+    perror("Invalid message format, Usage: %m <Number of Handles> <Handle Name 1>.. <message>");
+}
 /*safely allocates space*/
 void *safe_malloc(size_t size){ 
     void *newobj = malloc(size);
@@ -121,7 +124,7 @@ void sendChatHeader(int socketNum, int flag){
 
 void printHandlePacket(unsigned char *packet){
     char handleLen = packet[3];
-    unsigned char printableBuf[MAX_SIZE] = {0};
+    unsigned char printableBuf[MAXBUF] = {0};
     memcpy(printableBuf, &(packet[4]), handleLen);
 
     printf("%s", printableBuf);
@@ -135,60 +138,10 @@ void sendHandlePacket(int socketNum, unsigned char *name, int handleLen, int fla
     memcpy(buf, &ch, 3);
     memcpy(&buf[3], &h, handleLen+1);
     send(socketNum, buf, handleLen + 4, 0);
-    printf("Sent Packet %d\n", flag);
-}
-//in client, use a while loop to block until the number of handles is gone, this is null terminated, use strlen to get from argv
-void sendPacket4(int socketNum, unsigned char *message, unsigned char *name){
-    unsigned char buf[MAX_SIZE] = {0};
-    int messageLen = strlen(&message[3]);
-    int handleLen = strlen(name);
-    struct chat_header ch = {htons(4 + handleLen + messageLen), 4};
-    memcpy(buf, &ch, 3);
-    buf[3] = (unsigned char)handleLen;
-    memcpy(&buf[4], name, handleLen);
-    memcpy(&buf[4 + handleLen], &(message[3]), messageLen);
-    send(socketNum, buf, 4+handleLen+messageLen, 0);
-
-}
-void sendPacket5(int socketNum, unsigned char *message, unsigned char *name){
-    unsigned char buf[MAX_SIZE] = {0};
-    struct chat_header ch = {0, MESSAGE_FLAG};
-    unsigned short currentLen = 3;
-    unsigned short s;
-    int numOfHandles = 0;
-    unsigned char *tok;
-    //skip %m, the first token
-    strtok(message, " ");
-    tok = strtok(NULL, " ");
-    printf("%d\n", atoi(tok));
-    numOfHandles = atoi(tok);//get num of handles from second token
-    buf[currentLen] = (unsigned char)strlen(name);
-    memcpy(&buf[currentLen+1], name, strlen(name));
-    currentLen += (strlen(name) +1);
-    buf[currentLen] = (unsigned char)numOfHandles;
-    currentLen++;
-    while(numOfHandles){ //while there are handles left
-        tok = strtok(NULL, " ");
-        buf[currentLen] = (unsigned char)strlen(tok);
-        memcpy(&buf[currentLen+1], tok, strlen(tok));
-        currentLen += (strlen(tok) + 1); //include 1 byte for the len, and the number of bytes for the handle
-        numOfHandles--;
-    }
-    if (tok = strtok(NULL, "")){
-        memcpy(&buf[currentLen], tok, strlen(tok));
-        currentLen += strlen(tok);
-    }
-
-    s = htons(currentLen);
-    printf("currentLen : %d, s : %d\n", currentLen, s);
-    ch.pdu_len = s;
-    printf("pdu_len : %d\n", ch.pdu_len);
-    memcpy(buf, &ch, 3);
-    send(socketNum, buf, currentLen, 0);
-
+    //printf("Sent Packet %d\n", flag);
 }
 void printMessage(unsigned char *packetBuf, int packetLen){
-    printf("Got to printMessage\n");
+    //printf("Got to printMessage\n");
     if (packetBuf[2] == BROADCAST_FLAG){
         printf("%.*s: %.*s\n", packetBuf[3], &packetBuf[4], packetLen - (packetBuf[3] + 4), &packetBuf[packetBuf[3] + 4]);
     }
@@ -200,9 +153,141 @@ void printMessage(unsigned char *packetBuf, int packetLen){
             idx += (packetBuf[idx]+1);
             numOfHandles--;
         }
-        printf("%.*s\n", (packetLen) - idx, &packetBuf[idx]);
+        printf("%s", &packetBuf[idx]);
+        printf("\n");
+        //printf("%.*s\n", (packetLen) - idx, &packetBuf[idx]);
     }
 }
+//adds message to buffer, doesnt prepend length
+int addMessageBuf(unsigned char *buf, int currentIndex, unsigned char *name, int messageLen){
+        memcpy(&buf[currentIndex], name, messageLen);
+        buf[currentIndex+messageLen] = '\0';
+        return currentIndex + messageLen + 1; 
+}
+
+//attaches chat header
+void finalizeBuf(unsigned char *buf, unsigned short packetLen, int flag){
+    struct chat_header ch = {0, 0};
+    ch.pdu_len = htons(packetLen);
+    ch.flag = flag;
+    memcpy(buf, &ch, 3);
+}
+void handle200(int socketNum, unsigned char *buf, int currentIndex, unsigned char *token, int flag){
+    unsigned char tempBuf[MAXBUF] = {0};
+    int toklen = strlen(token);
+    int tokidx = 0;
+    int tempLen;
+    while(toklen > 199){
+        memcpy(tempBuf, buf, currentIndex);
+        tempLen = addMessageBuf(tempBuf, currentIndex, &(token[tokidx]), 199);
+        // memcpy(&buf[currentLen], &tok[i], );
+        // currentLen += strlen(tok);
+        toklen -= 199;
+        tokidx += 199;
+        finalizeBuf(tempBuf, tempLen, flag);
+        send(socketNum, tempBuf, tempLen, 0);
+    }
+    //if remainder, send it off
+    if (toklen > 0){
+        currentIndex = addMessageBuf(buf, currentIndex, &token[tokidx], toklen);
+        // memcpy(&buf[currentLen], &tok[i], );
+        // currentLen += strlen(tok);
+        finalizeBuf(buf, currentIndex, flag);
+        send(socketNum, buf, currentIndex, 0);
+    }
+
+    
+}
+// void sendPacket4(int socketNum, unsigned char *message, unsigned char *name){
+//     unsigned char buf[MAXBUF] = {0};
+//     int messageLen = strlen(&message[3]);
+//     printf("messageLen = %d\n", messageLen);
+//     int handleLen = strlen(name);
+//     struct chat_header ch = {htons(4 + handleLen + messageLen), 4};
+//     memcpy(buf, &ch, 3);
+//     buf[3] = (unsigned char)handleLen;
+//     memcpy(&buf[4], name, handleLen);
+//     memcpy(&buf[4 + handleLen], &(message[3]), messageLen);
+//     send(socketNum, buf, 4+handleLen+messageLen, 0);
+
+// }
+// in client, use a while loop to block until the number of handles is gone, this is null terminated, use strlen to get from argv
+void sendPacket4(int socketNum, unsigned char *message, unsigned char *name){
+    unsigned char buf[MAXBUF] = {0};
+    int messageLen = strlen(&message[3]); //guaranteed to be 3
+    int handleLen = strlen(name);
+    struct chat_header ch = {htons(4 + handleLen + messageLen), 4};
+    memcpy(buf, &ch, 3);
+    buf[3] = (unsigned char)handleLen;
+    memcpy(&buf[4], name, handleLen);
+    if (199 < (messageLen)){
+        handle200(socketNum, buf, 4+handleLen, &message[3], BROADCAST_FLAG);
+
+    }
+    else{
+        memcpy(&buf[4 + handleLen], &(message[3]), messageLen);
+        send(socketNum, buf, 4+handleLen+messageLen, 0);
+    }
+
+
+}
+//returns current index of buffer, prepends the handle length
+int addHandleBuf(unsigned char *buf, int currentIndex, unsigned char *name, int handleLen){
+        buf[currentIndex] = (unsigned char)handleLen;
+        memcpy(&buf[currentIndex+1], name, handleLen);
+        return currentIndex + (handleLen + 1); //include 1 byte for the len, and the number of bytes for the handle
+}
+
+void sendPacket5(int socketNum, unsigned char *message, unsigned char *name){
+    unsigned char buf[MAXBUF] = {0};
+    int toklen;
+    unsigned short currentLen = 3;
+    int numOfHandles = 0;
+    unsigned char *tok;
+    //skip %m, the first token
+    strtok(message, " ");
+    if(NULL == (tok = strtok(NULL, " "))){
+        perror("Invalid command format");
+        return;
+    }
+    //printf("%d\n", atoi(tok));
+    if (1 > (numOfHandles = atoi(tok)) || 9 < numOfHandles) //get num of handles from second token
+        {
+            perror("Number of handles is invalid. (Valid numbers: 0-9)");
+            return;
+        }
+    
+    currentLen = addHandleBuf(buf, currentLen, name, strlen(name));
+
+    buf[currentLen] = (unsigned char)numOfHandles;
+    currentLen++;
+    while(numOfHandles){ //while there are handles left
+        if(NULL == (tok = strtok(NULL, " "))){
+            messageFormat();
+            return;
+        }
+        currentLen = addHandleBuf(buf, currentLen, tok, strlen(tok));
+
+        numOfHandles--;
+    }
+    if (tok = strtok(NULL, "")){
+        if (200 < (toklen = strlen(tok) +1)){
+            handle200(socketNum, buf, currentLen, tok, MESSAGE_FLAG);
+
+            return;
+        }
+        else{
+            currentLen = addMessageBuf(buf, currentLen, tok, strlen(tok));
+            finalizeBuf(buf, currentLen, MESSAGE_FLAG);
+            send(socketNum, buf, currentLen, 0);
+        }
+    }
+    else{
+        finalizeBuf(buf, currentLen, MESSAGE_FLAG);
+        send(socketNum, buf, currentLen, 0);
+    }
+}
+
 
 void parseMessageErr(unsigned char *packetBuf, int packetLen){
     printf("Error: User doesn't exist:");
@@ -222,7 +307,7 @@ void sendHandleNumPacket(int socketNum, int numOfHandles){
 int processPacket1(int socketNum, unsigned char *field, int handleLen){
     //Positive response to flag 1
     if(!checkTable(field, handleLen))
-    {   printf("procPack1 len: %d\n", handleLen);
+    {   //printf("procPack1 len: %d\n", handleLen);
         addTable(socketNum, field, handleLen);
         sendChatHeader(socketNum, 2);
         return 1;    
@@ -234,10 +319,10 @@ int processPacket1(int socketNum, unsigned char *field, int handleLen){
     }
 }
 //NULL check to see if we can broadcast to that socket,            
-void processPacket4(unsigned char *packetBuf, int packetLen){
+void processPacket4(int socketNum, unsigned char *packetBuf, int packetLen){
     int i;
     for (i = 0; i < tableSize; i++){
-        if (handleTable[i] != NULL){
+        if (handleTable[i] != NULL && i != socketNum){
             send(i, packetBuf, packetLen, 0);
         }
     }
@@ -248,17 +333,17 @@ void processPacket5(int socketNum, unsigned char *packetBuf, int packetLen){
     int i = 4;//use this index to start parsing the names
     i+= packetBuf[3];
     int numOfHandles = packetBuf[i]; //handles we gotta go through
-    printf("NumOfHandles %d\n", numOfHandles);
+    //printf("NumOfHandles %d\n", numOfHandles);
     i++;
     while (numOfHandles){
         //checktable will get us the correct socket number, if a valid one exists, 
         if(!(clientSocket = checkTable(&packetBuf[i+1], packetBuf[i]))){
             sendHandlePacket(socketNum, &packetBuf[i+1], packetBuf[i], 7);
-            printf("Sent packet7 back to socket %d\n", clientSocket);
+            //printf("Sent packet7 back to socket %d\n", clientSocket);
         }
         else{
             send(clientSocket, packetBuf, packetLen, 0);
-            printf("Forwarded message to socket %d\n", clientSocket);
+            //printf("Forwarded message to socket %d\n", clientSocket);
         }
         i += packetBuf[i] + 1;
         numOfHandles--;
@@ -275,14 +360,14 @@ void processPacket10(int socketNum){
     int i = 0;
     int d = getNumOfHandles();
     sendHandleNumPacket(socketNum, getNumOfHandles());
-    printf("Sent packet 11 with number : %d\n", d);
+    //printf("Sent packet 11 with number : %d\n", d);
     for(i; i<tableSize; i++){
         if (handleTable[i] != NULL){
             sendHandlePacket(socketNum, handleTable[i] -> field, handleTable[i] -> len, 12);
         }
     }
     sendChatHeader(socketNum, 13);
-    printf("sent chat header\n");
+    //printf("sent chat header\n");
 }
 
 void processPacket11(int socketNum, unsigned char *packetBuf){
@@ -346,19 +431,19 @@ int recvPacket(int clientSocket, unsigned char *buf){
     //already read first 2 bytes, now get rest
 	printf("recv first 2 packets : %d, pdulen: %d\n", packetIndex, pdu_len);
 	if (pdu_len > (MAXBUF-2)){
-		printf("C1\n");
+		//printf("C1\n");
         packetIndex += recvAll(clientSocket, &buf[packetIndex], MAXBUF - packetIndex, 0);
 
 	}
 	else{
-		printf("C2\n");
+		//printf("C2\n");
         packetIndex += recvAll(clientSocket, &buf[packetIndex], pdu_len-packetIndex, 0);
 	}
-	printf("Message received, length: %d Data: %.*s\n", pdu_len, pdu_len, buf);
-    int d = 0;
-    for (d; d < pdu_len; d++){
-        printf("%02X", buf[d]);
-    }
-    printf("\n");
+	// //printf("Message received, length: %d Data: %.*s\n", pdu_len, pdu_len, buf);
+    // int d = 0;
+    // for (d; d < pdu_len; d++){
+    //     printf("%02X", buf[d]);
+    // }
+    // printf("\n");
 	return packetIndex;
 }

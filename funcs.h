@@ -36,13 +36,14 @@ struct handle
 
 //use a global variable to count the pdulen
 void parseMessage(unsigned char *packetBuf, int packetLen);
+void printMessage(unsigned char *packetBuf, int packetLen);
 void parseMessageErr(unsigned char *packetBuf, int packetLen);
 void sendPacket4(int socketNum, unsigned char *message, unsigned char *name);
 void sendPacket5(int socketNum, unsigned char *message, unsigned char *name);
 void sendHandlePacket(int socketNum, unsigned char *name, int handleLen, int flag);
 int processPacket1(int socketNum, unsigned char *field, int handleLen);
 
-void processPacket4(unsigned char *packetBuf, int packetLen);
+void processPacket4(int socketNum, unsigned char *packetBuf, int packetLen);
 void processPacket5(int socketNum, unsigned char *packetBuf, int packetLen);
 void processPacket8(int socketNum);
 void processPacket10(int socketNum);

@@ -41,7 +41,7 @@ int processServerPacket(int socketNum, unsigned char *packetBuf, int packetLen){
             //special case
             return processPacket1(socketNum, &packetBuf[4], packetBuf[3]);
         case BROADCAST_FLAG:
-            processPacket4(packetBuf, packetLen);
+            processPacket4(socketNum, packetBuf, packetLen);
 			return BROADCAST_FLAG;
         //if handletable[i] not NULL, forward the packet to them
 		//will sent packet7 as ERROR back to client
@@ -91,7 +91,7 @@ int processServerPacket(int socketNum, unsigned char *packetBuf, int packetLen){
 // }
 
 int main(int argc, char *argv[])
-{	unsigned char buf[MAX_SIZE];
+{	unsigned char buf[MAXBUF];
 	int serverSocket = 0;   //socket descriptor for the server socket
 	int clientSocket = 0;   //socket descriptor for the client socket
 	int portNumber = 0;
