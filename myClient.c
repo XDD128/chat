@@ -46,9 +46,11 @@ int processClientPacket(int socketNum, unsigned char *packetBuf, int packetLen){
 	//if handletable[i] not NULL, forward the packet to them
 	//will sent packet7 as ERROR back to client
 	case MESSAGE_FLAG:
-		parseMessage(packetBuf, packetLen);
+		printMessage(packetBuf, packetLen);
+		break;
 	case MESSAGE_ERR:
 		parseMessageErr(packetBuf, packetLen);
+		break;
 	//check 
 
 	case EXIT_OK:
@@ -75,19 +77,13 @@ void takeInput(int socketNum, unsigned char *handleName){
 	len = strlen(buf) - 1;
 	buf[len] = 0; //NULL out the newline character
 
-	tok = strtok(buf, " ");
-	if (tok[0] == '%'){
-		tok[1] = tolower(tok[1]);
-		switch(tok[1])
+	if (buf[0] == '%'){
+		buf[1] = tolower(buf[1]);
+		switch(buf[1])
 		{
 			case 'm':
 				//
-				numOfHandles = (unsigned char)atoi(strtok(NULL, " "));
-				if (numOfHandles < 1 && numOfHandles > 9){
-					perror("Number of handles invalid. (Range 1-9)");
-					break;
-				}
-				//sendPacket5();
+				sendPacket5(socketNum, buf, handleName);
 				break;
 				
 			case 'b':

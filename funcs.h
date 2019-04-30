@@ -38,6 +38,7 @@ struct handle
 void parseMessage(unsigned char *packetBuf, int packetLen);
 void parseMessageErr(unsigned char *packetBuf, int packetLen);
 void sendPacket4(int socketNum, unsigned char *message, unsigned char *name);
+void sendPacket5(int socketNum, unsigned char *message, unsigned char *name);
 void sendHandlePacket(int socketNum, unsigned char *name, int handleLen, int flag);
 int processPacket1(int socketNum, unsigned char *field, int handleLen);
 

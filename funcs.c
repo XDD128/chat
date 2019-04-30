@@ -112,18 +112,12 @@ void delTable(int socketNumber){
     free(handleTable[socketNumber]);
     handleTable[socketNumber] = NULL;
 }
-void sendPacket5(unsigned char *input);
 
 void sendChatHeader(int socketNum, int flag){
     struct chat_header ch = {htons(3), flag};
     send(socketNum, &ch, 3, 0);
 }
-void parseMessage(unsigned char *packetBuf, int packetLen){
 
-}
-void parseMessageErr(unsigned char *packetBuf, int packetLen){
-
-}
 
 void printHandlePacket(unsigned char *packet){
     char handleLen = packet[3];
@@ -156,6 +150,43 @@ void sendPacket4(int socketNum, unsigned char *message, unsigned char *name){
     send(socketNum, buf, 4+handleLen+messageLen, 0);
 
 }
+void sendPacket5(int socketNum, unsigned char *message, unsigned char *name){
+    unsigned char buf[MAX_SIZE] = {0};
+    struct chat_header ch = {0, MESSAGE_FLAG};
+    unsigned short currentLen = 3;
+    unsigned short s;
+    int numOfHandles = 0;
+    unsigned char *tok;
+    //skip %m, the first token
+    strtok(message, " ");
+    tok = strtok(NULL, " ");
+    printf("%d\n", atoi(tok));
+    numOfHandles = atoi(tok);//get num of handles from second token
+    buf[currentLen] = (unsigned char)strlen(name);
+    memcpy(&buf[currentLen+1], name, strlen(name));
+    currentLen += (strlen(name) +1);
+    buf[currentLen] = (unsigned char)numOfHandles;
+    currentLen++;
+    while(numOfHandles){ //while there are handles left
+        tok = strtok(NULL, " ");
+        buf[currentLen] = (unsigned char)strlen(tok);
+        memcpy(&buf[currentLen+1], tok, strlen(tok));
+        currentLen += (strlen(tok) + 1); //include 1 byte for the len, and the number of bytes for the handle
+        numOfHandles--;
+    }
+    if (tok = strtok(NULL, "")){
+        memcpy(&buf[currentLen], tok, strlen(tok));
+        currentLen += strlen(tok);
+    }
+
+    s = htons(currentLen);
+    printf("currentLen : %d, s : %d\n", currentLen, s);
+    ch.pdu_len = s;
+    printf("pdu_len : %d\n", ch.pdu_len);
+    memcpy(buf, &ch, 3);
+    send(socketNum, buf, currentLen, 0);
+
+}
 void printMessage(unsigned char *packetBuf, int packetLen){
     printf("Got to printMessage\n");
     if (packetBuf[2] == BROADCAST_FLAG){
@@ -164,12 +195,19 @@ void printMessage(unsigned char *packetBuf, int packetLen){
     else if (packetBuf[2] == MESSAGE_FLAG){
         printf("%.*s: ", packetBuf[3], &packetBuf[4]);
         int idx = 4 + packetBuf[3];
-        int numOfHandles = packetBuf[idx];
+        int numOfHandles = packetBuf[idx++];
         while (numOfHandles){
             idx += (packetBuf[idx]+1);
+            numOfHandles--;
         }
-        printf("%.*s\n", (packetLen - 1) - idx, &packetBuf[idx]);
+        printf("%.*s\n", (packetLen) - idx, &packetBuf[idx]);
     }
+}
+
+void parseMessageErr(unsigned char *packetBuf, int packetLen){
+    printf("Error: User doesn't exist:");
+    printHandlePacket(packetBuf);
+    printf("\n");
 }
 void sendHandleNumPacket(int socketNum, int numOfHandles){
     unsigned char buf[MAXBUF];
@@ -208,7 +246,10 @@ void processPacket4(unsigned char *packetBuf, int packetLen){
 void processPacket5(int socketNum, unsigned char *packetBuf, int packetLen){
     int clientSocket;
     int i = 4;//use this index to start parsing the names
-    int numOfHandles = packetBuf[3]; //handles we gotta go through
+    i+= packetBuf[3];
+    int numOfHandles = packetBuf[i]; //handles we gotta go through
+    printf("NumOfHandles %d\n", numOfHandles);
+    i++;
     while (numOfHandles){
         //checktable will get us the correct socket number, if a valid one exists, 
         if(!(clientSocket = checkTable(&packetBuf[i+1], packetBuf[i]))){
@@ -219,6 +260,7 @@ void processPacket5(int socketNum, unsigned char *packetBuf, int packetLen){
             send(clientSocket, packetBuf, packetLen, 0);
             printf("Forwarded message to socket %d\n", clientSocket);
         }
+        i += packetBuf[i] + 1;
         numOfHandles--;
     }
 }
