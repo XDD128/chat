@@ -121,7 +121,7 @@ int tcpClientSetup(char * serverName, char * port, int debugFlag)
 		exit(-1);
 	}
 
-	printf("server ip address: %s\n", getIPAddressString(ipAddress));
+	//printf("server ip address: %s\n", getIPAddressString(ipAddress));
 	if(connect(socket_num, (struct sockaddr*)&server, sizeof(server)) < 0)
 	{
 		perror("connect call");

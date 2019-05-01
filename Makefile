@@ -6,13 +6,13 @@ CFLAGS= -g -Wall
 LIBS = 
 OBJS = networks.o gethostbyname6.o funcs.o
 
-all:   myClient myServer
+all:   cclient server
 
-myClient: myClient.c $(OBJS)
-	$(CC) $(CFLAGS) -o myClient myClient.c $(OBJS) $(LIBS)
+cclient: cclient.c $(OBJS)
+	$(CC) $(CFLAGS) -o cclient cclient.c $(OBJS) $(LIBS)
 
-myServer: myServer.c $(OBJS)
-	$(CC) $(CFLAGS) -o myServer myServer.c $(OBJS) $(LIBS)
+server: server.c $(OBJS)
+	$(CC) $(CFLAGS) -o server server.c $(OBJS) $(LIBS)
 
 .c.o:
 	gcc -c $(CFLAGS) $< -o $@ $(LIBS)
@@ -21,7 +21,7 @@ cleano:
 	rm -f *.o
 
 clean:
-	rm -f myServer myClient *.o
+	rm -f cclient server *.o
 
 
 

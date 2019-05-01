@@ -19,7 +19,11 @@
 static handle *handleTable;
 static int tableSize;
 //set to size 10
-
+void tooLong(){
+    perror("Message too long, must be under 1400 characters. Hit enter.");
+    //ignore all input until newline
+    while (fgetc(stdin) != '\n');
+}
 void messageFormat(){
     perror("Invalid message format, Usage: %m <Number of Handles> <Handle Name 1>.. <message>");
 }
@@ -104,7 +108,7 @@ void addTable(int socketNumber, unsigned char *field, int handleLen){
             handleTable[i] = NULL;
         }
     }
-    printf("addTable, length: %d Data: %.*s\n", handleLen, handleLen, field);
+    //printf("addTable, length: %d Data: %.*s\n", handleLen, handleLen, field);
     handleTable[socketNumber] = (handle)safe_malloc(sizeof(struct handle));
     handleTable[socketNumber] -> len = handleLen;
     memcpy((handleTable[socketNumber] -> field), field, handleLen);
@@ -112,8 +116,12 @@ void addTable(int socketNumber, unsigned char *field, int handleLen){
 }
 //delete a table entry by freeing, triggered by flag, will assume called only if exists
 void delTable(int socketNumber){
-    free(handleTable[socketNumber]);
-    handleTable[socketNumber] = NULL;
+    //already deleted, wont happen usually tho
+    if (handleTable[socketNumber] != NULL){
+        free(handleTable[socketNumber]);
+        handleTable[socketNumber] = NULL;
+    }
+
 }
 
 void sendChatHeader(int socketNum, int flag){
@@ -142,6 +150,7 @@ void sendHandlePacket(int socketNum, unsigned char *name, int handleLen, int fla
 }
 void printMessage(unsigned char *packetBuf, int packetLen){
     //printf("Got to printMessage\n");
+    printf("\n");
     if (packetBuf[2] == BROADCAST_FLAG){
         printf("%.*s: %.*s\n", packetBuf[3], &packetBuf[4], packetLen - (packetBuf[3] + 4), &packetBuf[packetBuf[3] + 4]);
     }
@@ -153,8 +162,7 @@ void printMessage(unsigned char *packetBuf, int packetLen){
             idx += (packetBuf[idx]+1);
             numOfHandles--;
         }
-        printf("%s", &packetBuf[idx]);
-        printf("\n");
+        printf("%s\n", &packetBuf[idx]);
         //printf("%.*s\n", (packetLen) - idx, &packetBuf[idx]);
     }
 }
@@ -226,6 +234,9 @@ void sendPacket4(int socketNum, unsigned char *message, unsigned char *name){
     }
     else{
         memcpy(&buf[4 + handleLen], &(message[3]), messageLen);
+        if ((4+handleLen+messageLen) > MAXBUF){
+            
+        }
         send(socketNum, buf, 4+handleLen+messageLen, 0);
     }
 
@@ -290,7 +301,7 @@ void sendPacket5(int socketNum, unsigned char *message, unsigned char *name){
 
 
 void parseMessageErr(unsigned char *packetBuf, int packetLen){
-    printf("Error: User doesn't exist:");
+    printf("Error: User doesn't exist: ");
     printHandlePacket(packetBuf);
     printf("\n");
 }
@@ -376,12 +387,13 @@ void processPacket11(int socketNum, unsigned char *packetBuf){
     unsigned long numOfHandles;
     memcpy(&numOfHandles, &(packetBuf[3]), 4);
     numOfHandles = ntohl(numOfHandles);
-    printf("Number of Handles is %ld\n", numOfHandles);
+    printf("Number of Clients: %ld\n", numOfHandles);
     FD_ZERO(&sock);
     while (numOfHandles){
         FD_SET(socketNum, &sock);
         select(socketNum + 1, &sock, (fd_set*) 0, (fd_set*)0, NULL);
         packetLen = recvPacket(socketNum, packetBuf);
+        printf("  ");
         printHandlePacket(packetBuf);
         printf("\n");
         numOfHandles--;
@@ -429,7 +441,7 @@ int recvPacket(int clientSocket, unsigned char *buf){
 	pdu_len = ntohs(pdu_len);
 	packetIndex += messageLen;
     //already read first 2 bytes, now get rest
-	printf("recv first 2 packets : %d, pdulen: %d\n", packetIndex, pdu_len);
+	//printf("recv first 2 packets : %d, pdulen: %d\n", packetIndex, pdu_len);
 	if (pdu_len > (MAXBUF-2)){
 		//printf("C1\n");
         packetIndex += recvAll(clientSocket, &buf[packetIndex], MAXBUF - packetIndex, 0);
